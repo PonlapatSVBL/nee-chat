@@ -40,8 +40,10 @@ describe('loan use cases', () => {
     expect(badMoney.ok).toBe(false);
     if (!badMoney.ok) expect(badMoney.error.code).toBe('INVALID_AMOUNT');
     const badDate = await setup.execute({ ...input, openingBalanceDate: '30/06/2026' });
+    expect(badDate.ok).toBe(false);
     if (!badDate.ok) expect(badDate.error.code).toBe('INVALID_DATE');
     const badName = await setup.execute({ ...input, name: '' });
+    expect(badName.ok).toBe(false);
     if (!badName.ok) expect(badName.error.code).toBe('INVALID_NAME');
   });
 
@@ -61,5 +63,18 @@ describe('loan use cases', () => {
     if (!missing.ok) expect(missing.error.code).toBe('LOAN_NOT_FOUND');
     const otherUser = await update.execute({ ...input, loanId: created.value.loanId, userId: 'u2' });
     expect(otherUser.ok).toBe(false);
+    if (!otherUser.ok) expect(otherUser.error.code).toBe('LOAN_NOT_FOUND');
+  });
+
+  it('SetupLoan treats whitespace defaultAmount as none and rejects invalid defaultAmount', async () => {
+    const setup = new SetupLoan(ctx.repos.loans, ctx.ids, ctx.clock);
+    const blank = await setup.execute({ ...input, defaultAmount: '   ' });
+    expect(blank.ok).toBe(true);
+    expect((await new GetLoan(ctx.repos.loans).execute('u1'))?.defaultAmount).toBeNull();
+
+    const other = makeTestContext();
+    const bad = await new SetupLoan(other.repos.loans, other.ids, other.clock).execute({ ...input, defaultAmount: 'abc' });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error.code).toBe('INVALID_AMOUNT');
   });
 });
