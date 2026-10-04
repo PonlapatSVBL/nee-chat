@@ -15,6 +15,20 @@
       "when": 1791116597190,
       "tag": "0001_rls_and_evidence_bucket",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791121644575,
+      "tag": "0002_rls_select_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791121659660,
+      "tag": "0003_loans_user_unique",
+      "breakpoints": true
     }
   ]
 }

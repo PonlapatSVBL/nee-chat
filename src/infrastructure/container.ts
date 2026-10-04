@@ -16,7 +16,7 @@ import { createDb } from '@/infrastructure/db/client';
 import { makeRepositories } from '@/infrastructure/repositories';
 import { DrizzleUnitOfWork } from '@/infrastructure/repositories/unit-of-work';
 import { SupabaseFileStorage } from '@/infrastructure/storage/supabase-file-storage';
-import { createServiceClient } from '@/infrastructure/supabase/service-client';
+import { createServiceClient } from '@/infrastructure/supabase/service-client.server';
 import { SystemClock } from '@/infrastructure/system/clock';
 import { UuidIdGenerator } from '@/infrastructure/system/ids';
 

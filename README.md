@@ -65,6 +65,8 @@ The evidence picker uses `crypto.randomUUID()`, which only exists in a secure co
 - Ledger Balance = opening balance − Σ ACTIVE payments dated after the opening-balance date.
 - Payments are immutable. Editing voids the original and creates a replacement linked by a correction record. Voiding records a correction without a replacement.
 - Evidence files live in the private `evidence` bucket and are served through 1-hour signed URLs.
+- "Today" (future-date checks, default dates) is computed in Asia/Bangkok regardless of the server time zone.
+- Database RLS uses select-only owner policies; all writes go through the server.
 
 ## Deploy
 

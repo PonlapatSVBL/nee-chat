@@ -84,6 +84,17 @@ describe('VoidPayment / CorrectPayment', () => {
     expect(voided.ok).toBe(false);
     if (!voided.ok) expect(voided.error.code).toBe('PAYMENT_ALREADY_VOIDED');
 
+    // already-voided original with newly uploaded files: delete only the new files
+    const withFiles = await cp.execute({
+      userId: 'u1', originalPaymentId: paymentId, newPaymentId: 'p3b', reason: 'y',
+      paidAt: '2026-10-04', amount: '1', paymentMethod: 'ATM', referenceNo: null, notes: null,
+      newEvidence: [{ fileId: 'f3b', storagePath: 'u1/payments/p3b/f3b.jpg', mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null }],
+    });
+    expect(withFiles.ok).toBe(false);
+    if (!withFiles.ok) expect(withFiles.error.code).toBe('PAYMENT_ALREADY_VOIDED');
+    expect(ctx.storage.deleted).toContain('u1/payments/p3b/f3b.jpg');
+    expect(ctx.storage.deleted).not.toContain('u1/payments/p1/f1.jpg');
+
     // fresh active payment, then force persistence failure
     const recorded = await new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock).execute({
       userId: 'u1', loanId, paymentId: 'p4', paidAt: '2026-10-01', amount: '100', paymentMethod: 'ATM', referenceNo: null, notes: null, evidence: [],

@@ -1,4 +1,4 @@
-import { date, index, integer, numeric, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { date, index, integer, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const paymentMethodEnum = pgEnum('payment_method', ['MOBILE_BANKING', 'COUNTER', 'ATM', 'OTHER']);
 export const paymentStatusEnum = pgEnum('payment_status', ['ACTIVE', 'VOIDED']);
@@ -20,7 +20,7 @@ export const loans = pgTable(
     createdAt: ts('created_at').notNull(),
     updatedAt: ts('updated_at').notNull(),
   },
-  (t) => [index('loans_user_idx').on(t.userId)],
+  (t) => [uniqueIndex('loans_user_uq').on(t.userId)],
 );
 
 export const payments = pgTable(

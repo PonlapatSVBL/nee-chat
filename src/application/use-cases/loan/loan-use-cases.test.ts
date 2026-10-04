@@ -34,6 +34,22 @@ describe('loan use cases', () => {
     if (!again.ok) expect(again.error.code).toBe('LOAN_ALREADY_EXISTS');
   });
 
+  it('SetupLoan maps a unique-index race (loans_user_uq) to LOAN_ALREADY_EXISTS and rethrows other errors', async () => {
+    const racing = {
+      findByUserId: async () => null,
+      findById: async () => null,
+      save: async () => {
+        throw new Error('duplicate key value violates unique constraint "loans_user_uq"');
+      },
+    };
+    const r = await new SetupLoan(racing, ctx.ids, ctx.clock).execute(input);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('LOAN_ALREADY_EXISTS');
+
+    const broken = { ...racing, save: async () => { throw new Error('connection reset'); } };
+    await expect(new SetupLoan(broken, ctx.ids, ctx.clock).execute(input)).rejects.toThrow('connection reset');
+  });
+
   it('SetupLoan rejects invalid money / date / name', async () => {
     const setup = new SetupLoan(ctx.repos.loans, ctx.ids, ctx.clock);
     const badMoney = await setup.execute({ ...input, openingBalance: 'abc' });

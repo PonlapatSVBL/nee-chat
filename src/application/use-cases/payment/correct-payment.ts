@@ -1,4 +1,4 @@
-import { copyEvidenceTo } from '@/domain/evidence/evidence';
+import { copyEvidenceTo, isPathOwnedBy } from '@/domain/evidence/evidence';
 import { createPayment, voidPayment } from '@/domain/payment/payment';
 import { DomainError } from '@/domain/shared/errors';
 import { err, ok, type Result } from '@/domain/shared/result';
@@ -28,7 +28,17 @@ export class CorrectPayment {
   async execute(input: CorrectPaymentInput): Promise<Result<{ paymentId: string }>> {
     const now = this.clock.now();
     const draft = parsePaymentInput(input, this.clock.today());
-    if (!draft.ok) return err(draft.error);
+    if (!draft.ok) {
+      // Spec §8: the user may already have uploaded files for the replacement; remove them (best effort).
+      const pending = input.newPaymentId;
+      if (pending) {
+        const owned = input.newEvidence
+          .map((e) => e.storagePath)
+          .filter((path) => isPathOwnedBy(path, input.userId, pending));
+        if (owned.length > 0) await this.storage.delete(owned).catch(() => undefined);
+      }
+      return err(draft.error);
+    }
 
     const newPaymentId = input.newPaymentId ?? this.ids.next();
     const newEvidence = buildEvidenceList(input.newEvidence, {
@@ -40,8 +50,9 @@ export class CorrectPayment {
     if (!newEvidence.ok) return err(newEvidence.error);
     const newPaths = newEvidence.value.map((e) => e.storagePath);
 
+    let result: Result<{ paymentId: string }>;
     try {
-      return await this.uow.run(async (repos) => {
+      result = await this.uow.run(async (repos): Promise<Result<{ paymentId: string }>> => {
         const original = await repos.payments.findById(input.originalPaymentId, input.userId);
         if (!original) return err(new DomainError('PAYMENT_NOT_FOUND', 'ไม่พบรายการชำระ'));
 
@@ -74,5 +85,10 @@ export class CorrectPayment {
       await this.storage.delete(newPaths).catch(() => undefined);
       return err(new DomainError('PERSISTENCE_FAILED', `แก้ไขรายการไม่สำเร็จ: ${String(cause)}`));
     }
+    if (!result.ok && newPaths.length > 0) {
+      // Domain refusal (not found / already voided / reason required): drop only the newly uploaded files.
+      await this.storage.delete(newPaths).catch(() => undefined);
+    }
+    return result;
   }
 }

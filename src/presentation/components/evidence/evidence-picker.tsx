@@ -16,6 +16,9 @@ interface Props {
   onProcessingChange?: (processing: boolean) => void;
 }
 
+/** Matches the server-side evidenceListInput max. */
+const MAX_FILES = 10;
+
 const pickerButton =
   'h-14 rounded-xl text-base font-medium transition-[transform,background-color,color] duration-150 ease-out-quart active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100';
 
@@ -37,7 +40,15 @@ export function EvidencePicker({ files, onChange, disabled, onProcessingChange }
 
   async function addFiles(list: FileList | null) {
     if (!list) return;
-    const selected = Array.from(list);
+    const remaining = Math.max(0, MAX_FILES - filesRef.current.length);
+    const picked = Array.from(list);
+    const selected = picked.slice(0, remaining);
+    if (picked.length > remaining) toast.error('แนบได้สูงสุด 10 ไฟล์');
+    if (selected.length === 0) {
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (galleryRef.current) galleryRef.current.value = '';
+      return;
+    }
     const added: PendingFile[] = [];
     setProcessing(true);
     onProcessingChange?.(true);

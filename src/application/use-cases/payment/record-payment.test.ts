@@ -67,6 +67,54 @@ describe('RecordPayment', () => {
     if (!r.ok) expect(r.error.code).toBe('INVALID_EVIDENCE_PATH');
   });
 
+  it('rejects a same-user path that belongs to another payment', async () => {
+    const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
+    const r = await record.execute({
+      ...base, loanId, paymentId: 'p-mine',
+      evidence: [{ fileId: 'f', storagePath: 'u1/payments/OTHER/f.jpg', mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null }],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('INVALID_EVIDENCE_PATH');
+  });
+
+  it('PrepareEvidenceUpload rejects unsupported types and oversize files', async () => {
+    const prepare = new PrepareEvidenceUpload(ctx.storage, ctx.ids);
+    const gif = await prepare.execute({ userId: 'u1', paymentId: null, mimeType: 'image/gif', sizeBytes: 10 });
+    expect(gif.ok).toBe(false);
+    if (!gif.ok) expect(gif.error.code).toBe('UNSUPPORTED_FILE_TYPE');
+    const big = await prepare.execute({ userId: 'u1', paymentId: null, mimeType: 'image/jpeg', sizeBytes: 5_242_881 });
+    expect(big.ok).toBe(false);
+    if (!big.ok) expect(big.error.code).toBe('FILE_TOO_LARGE');
+  });
+
+  it('deletes already-uploaded files when the domain refuses (future date)', async () => {
+    const path = 'u1/payments/p-future/f1.jpg';
+    ctx.storage.files.add(path);
+    const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
+    const r = await record.execute({
+      ...base, loanId, paymentId: 'p-future', paidAt: '2026-10-05',
+      evidence: [{ fileId: 'f1', storagePath: path, mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null }],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('FUTURE_DATE');
+    expect(ctx.storage.deleted).toContain(path);
+  });
+
+  it('refuses a payment id that already exists without touching storage', async () => {
+    const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
+    const first = await record.execute({ ...base, loanId, paymentId: 'p-dup', evidence: [] });
+    expect(first.ok).toBe(true);
+    const path = 'u1/payments/p-dup/f9.jpg';
+    ctx.storage.files.add(path);
+    const second = await record.execute({
+      ...base, loanId, paymentId: 'p-dup',
+      evidence: [{ fileId: 'f9', storagePath: path, mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null }],
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.error.code).toBe('PERSISTENCE_FAILED');
+    expect(ctx.storage.deleted).toEqual([]);
+  });
+
   it('rejects unknown loan, bad method, future date', async () => {
     const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
     const noLoan = await record.execute({ ...base, loanId: 'x', paymentId: null, evidence: [] });

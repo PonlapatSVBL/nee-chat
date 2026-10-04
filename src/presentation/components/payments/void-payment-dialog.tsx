@@ -37,8 +37,15 @@ export function VoidPaymentDialog({ paymentId }: { paymentId: string }) {
     }
     setBusy(true);
     setError(null);
-    const result = await voidPaymentAction({ paymentId, reason });
-    setBusy(false);
+    let result: Awaited<ReturnType<typeof voidPaymentAction>>;
+    try {
+      result = await voidPaymentAction({ paymentId, reason });
+    } catch {
+      toast.error('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง');
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (!result.ok) {
       setError(result.message);
       return;

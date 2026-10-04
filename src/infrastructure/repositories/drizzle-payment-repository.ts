@@ -39,8 +39,9 @@ export class DrizzlePaymentRepository implements PaymentRepository {
     await this.db.insert(payments).values(paymentToRow(payment));
   }
 
+  /** ACTIVE → VOIDED once. Throws if the row is missing or already voided, rolling back the unit of work. */
   async markVoided(payment: Payment): Promise<void> {
-    await this.db
+    const rows = await this.db
       .update(payments)
       .set({
         status: payment.status,
@@ -48,6 +49,8 @@ export class DrizzlePaymentRepository implements PaymentRepository {
         voidReason: payment.voidReason,
         replacedByPaymentId: payment.replacedByPaymentId,
       })
-      .where(and(eq(payments.id, payment.id), eq(payments.userId, payment.userId)));
+      .where(and(eq(payments.id, payment.id), eq(payments.userId, payment.userId), eq(payments.status, 'ACTIVE')))
+      .returning({ id: payments.id });
+    if (rows.length === 0) throw new Error('payment already voided or missing');
   }
 }

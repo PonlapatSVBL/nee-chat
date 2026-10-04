@@ -19,4 +19,23 @@ describe('database schema', () => {
     const bucket = await db.execute<{ id: string; public: boolean }>(sql`select id, public from storage.buckets where id = 'evidence'`);
     expect(bucket[0]).toMatchObject({ id: 'evidence', public: false });
   });
+
+  it('has select-only owner policies and a size/MIME-limited evidence bucket', async () => {
+    const db = createDb();
+    const policies = await db.execute<{ tablename: string; policyname: string; cmd: string }>(
+      sql`select tablename, policyname, cmd from pg_policies where schemaname = 'public' and tablename in ('loans','payments','payment_evidence','payment_corrections')`,
+    );
+    expect(new Set(policies.map((p) => p.tablename))).toEqual(
+      new Set(['loans', 'payments', 'payment_evidence', 'payment_corrections']),
+    );
+    expect(policies.every((p) => p.cmd === 'SELECT')).toBe(true);
+
+    const bucket = await db.execute<{ file_size_limit: string | number; allowed_mime_types: string[] }>(
+      sql`select file_size_limit, allowed_mime_types from storage.buckets where id = 'evidence'`,
+    );
+    expect(Number(bucket[0]?.file_size_limit)).toBe(5242880);
+    expect(bucket[0]?.allowed_mime_types).toEqual(
+      expect.arrayContaining(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']),
+    );
+  });
 });

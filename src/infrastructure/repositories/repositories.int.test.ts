@@ -88,6 +88,39 @@ describe('Drizzle repositories', () => {
     expect((await repos.corrections.findByReplacement(replacement.id, userId))?.originalPaymentId).toBe(p.id);
   });
 
+  it('refuses to void the same payment twice (ACTIVE guard)', async () => {
+    const target = pay('2026-09-10', '50');
+    const first = pay('2026-09-10', '49');
+    await repos.payments.insert(target);
+    await repos.payments.insert(first);
+
+    const v1 = voidPayment(target, 'ครั้งแรก', now, first.id);
+    if (!v1.ok) throw v1.error;
+    await repos.payments.markVoided(v1.value);
+
+    const v2 = voidPayment(target, 'ครั้งที่สอง', new Date('2026-10-05T00:00:00.000Z'), null);
+    if (!v2.ok) throw v2.error;
+    await expect(repos.payments.markVoided(v2.value)).rejects.toThrow('payment already voided or missing');
+
+    const reloaded = await repos.payments.findById(target.id, userId);
+    expect(reloaded?.status).toBe('VOIDED');
+    expect(reloaded?.voidReason).toBe('ครั้งแรก');
+    expect(reloaded?.replacedByPaymentId).toBe(first.id);
+  });
+
+  it('allows only one loan per user (loans_user_uq)', async () => {
+    const second = createLoan(
+      { name: 'ซ้ำ', loanNumber: null, openingBalance: Money.of('1'), openingBalanceDate: DateOnly.of('2026-06-30'), defaultAmount: null },
+      { id: randomUUID(), userId, now },
+    );
+    const error = await repos.loans.save(second).then(
+      () => null,
+      (e: unknown) => e as { message: string; cause?: { message?: string } },
+    );
+    // Drizzle wraps the driver error ("Failed query: ..."); the constraint name is on the cause.
+    expect(`${error?.message} ${error?.cause?.message ?? ''}`).toContain('loans_user_uq');
+  });
+
   it('rolls back the unit of work when a step throws', async () => {
     const uow = new DrizzleUnitOfWork(db);
     const p = pay('2026-10-01', '1');

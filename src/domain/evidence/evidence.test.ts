@@ -28,6 +28,28 @@ describe('validateFile', () => {
   });
 });
 
+describe('validateFile size boundary', () => {
+  it('accepts exactly MAX_EVIDENCE_BYTES and rejects one byte more', () => {
+    expect(validateFile({ mimeType: 'image/png', sizeBytes: MAX_EVIDENCE_BYTES }).ok).toBe(true);
+    const over = validateFile({ mimeType: 'image/png', sizeBytes: MAX_EVIDENCE_BYTES + 1 });
+    expect(over.ok).toBe(false);
+    if (!over.ok) expect(over.error.code).toBe('FILE_TOO_LARGE');
+  });
+});
+
+describe('isPathOwnedBy rejections', () => {
+  it.each([
+    'u1/payments/p1/sub/f.png',
+    'u1/payments/p1/../f.png',
+    'u1/payments/p1/f.exe',
+    'u1/payments/p2/f.png',
+    'u10/payments/p1/f.png',
+    'u1/payments/p1/',
+  ])('rejects %s for user u1 / payment p1', (path) => {
+    expect(isPathOwnedBy(path, 'u1', 'p1')).toBe(false);
+  });
+});
+
 describe('storage paths', () => {
   it('builds the canonical path and recognises ownership', () => {
     const path = buildStoragePath('u1', 'p1', 'f1', 'image/png');

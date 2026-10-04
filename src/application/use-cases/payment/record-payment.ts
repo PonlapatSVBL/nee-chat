@@ -1,3 +1,4 @@
+import { isPathOwnedBy } from '@/domain/evidence/evidence';
 import { createPayment } from '@/domain/payment/payment';
 import { DomainError } from '@/domain/shared/errors';
 import { err, ok, type Result } from '@/domain/shared/result';
@@ -27,13 +28,17 @@ export class RecordPayment {
 
   async execute(input: RecordPaymentInput): Promise<Result<{ paymentId: string }>> {
     const loan = await this.loans.findById(input.loanId, input.userId);
-    if (!loan) return err(new DomainError('LOAN_NOT_FOUND', 'ไม่พบข้อมูลเงินกู้'));
+    if (!loan) return this.refuse(input, new DomainError('LOAN_NOT_FOUND', 'ไม่พบข้อมูลเงินกู้'));
 
     const draft = parsePaymentInput(input, this.clock.today());
-    if (!draft.ok) return err(draft.error);
+    if (!draft.ok) return this.refuse(input, draft.error);
 
     const now = this.clock.now();
     const paymentId = input.paymentId ?? this.ids.next();
+    if (input.paymentId) {
+      const existing = await this.uow.run((repos) => repos.payments.findById(paymentId, input.userId));
+      if (existing) return err(new DomainError('PERSISTENCE_FAILED', 'duplicate payment id'));
+    }
     const evidence = buildEvidenceList(input.evidence, { userId: input.userId, paymentId, now, ids: this.ids });
     if (!evidence.ok) return err(evidence.error);
 
@@ -50,5 +55,17 @@ export class RecordPayment {
     }
 
     return ok({ paymentId });
+  }
+
+  /** Spec §8: when the domain refuses, delete files the user already uploaded for this payment (best effort). */
+  private async refuse(input: RecordPaymentInput, error: DomainError): Promise<Result<never>> {
+    const paymentId = input.paymentId;
+    if (paymentId && input.evidence.length > 0) {
+      const owned = input.evidence
+        .map((e) => e.storagePath)
+        .filter((path) => isPathOwnedBy(path, input.userId, paymentId));
+      if (owned.length > 0) await this.storage.delete(owned).catch(() => undefined);
+    }
+    return err(error);
   }
 }

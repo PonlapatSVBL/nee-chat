@@ -59,7 +59,10 @@ export class InMemoryPaymentRepository implements PaymentRepository {
   }
 
   async markVoided(payment: Payment): Promise<void> {
-    if (!this.payments.has(payment.id)) throw new Error(`unknown payment ${payment.id}`);
+    const stored = this.payments.get(payment.id);
+    if (!stored || stored.userId !== payment.userId || stored.status !== 'ACTIVE') {
+      throw new Error('payment already voided or missing');
+    }
     this.payments.set(payment.id, payment);
   }
 }

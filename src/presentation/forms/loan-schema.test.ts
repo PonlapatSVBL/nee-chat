@@ -21,6 +21,13 @@ describe('loanFormSchema', () => {
     expect(errors.defaultAmount).toBe('กรอกตัวเลข ทศนิยมไม่เกิน 2 ตำแหน่ง');
   });
 
+  it('caps money at 10 integer digits (numeric(12,2))', () => {
+    expect(loanFormSchema.safeParse({ ...valid, openingBalance: '1234567890.99' }).success).toBe(true);
+    expect(loanFormSchema.safeParse({ ...valid, openingBalance: '1,234,567,890' }).success).toBe(true);
+    expect(loanFormSchema.safeParse({ ...valid, openingBalance: '12345678901' }).success).toBe(false);
+    expect(loanFormSchema.safeParse({ ...valid, openingBalance: '12,345,678,901' }).success).toBe(false);
+  });
+
   it('reads FormData into string values', () => {
     const fd = new FormData();
     fd.set('name', 'x');

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { safePath } from '@/presentation/lib/auth/resolve-next';
 import { createSupabaseServerClient } from '@/presentation/lib/supabase/server';
 
 export type AuthActionState =
@@ -19,7 +20,7 @@ export async function sendMagicLinkAction(_prev: AuthActionState, formData: Form
   if (!parsed.success) {
     return { status: 'error', message: parsed.error.issues[0]?.message ?? 'ข้อมูลไม่ถูกต้อง' };
   }
-  const next = parsed.data.next.startsWith('/') && !parsed.data.next.startsWith('//') ? parsed.data.next : '/';
+  const next = safePath(parsed.data.next) ?? '/';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
   const supabase = await createSupabaseServerClient();

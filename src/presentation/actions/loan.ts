@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getContainer } from '@/infrastructure/container';
 import { zodFieldErrors } from '@/presentation/forms/field-errors';
+import { paymentIdInput as uuidInput } from '@/presentation/forms/payment-action-schemas';
 import { formDataToLoanValues, loanFormSchema, type LoanFormValues } from '@/presentation/forms/loan-schema';
 import { requireUserId } from '@/presentation/lib/supabase/server';
 import { messageFor } from '@/presentation/view-models/error-messages';
@@ -31,7 +32,12 @@ export async function saveLoanAction(_prev: LoanActionState, formData: FormData)
   };
 
   const loanIdRaw = formData.get('loanId');
-  const loanId = typeof loanIdRaw === 'string' && loanIdRaw ? loanIdRaw : null;
+  let loanId: string | null = null;
+  if (typeof loanIdRaw === 'string' && loanIdRaw) {
+    const id = uuidInput.safeParse(loanIdRaw);
+    if (!id.success) return { ok: false, message: 'ข้อมูลไม่ถูกต้อง', values };
+    loanId = id.data;
+  }
   const container = getContainer();
   const result = loanId
     ? await container.updateLoan.execute({ ...input, loanId })

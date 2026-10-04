@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const MONEY_PATTERN = /^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/;
+/** numeric(12,2): at most 10 integer digits, optional thousands separators, up to 2 decimals. */
+export const MONEY_PATTERN = /^(\d{1,3}(,\d{3}){0,2}|\d(,\d{3}){3}|\d{1,10})(\.\d{1,2})?$/;
 export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONEY_MESSAGE = 'กรอกตัวเลข ทศนิยมไม่เกิน 2 ตำแหน่ง';
 

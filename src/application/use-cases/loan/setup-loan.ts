@@ -21,7 +21,25 @@ export class SetupLoan {
     if (!draft.ok) return err(draft.error);
 
     const loan = createLoan(draft.value, { id: this.ids.next(), userId: input.userId, now: this.clock.now() });
-    await this.loans.save(loan);
+    try {
+      await this.loans.save(loan);
+    } catch (cause) {
+      // A concurrent setup can pass the findByUserId check; the loans_user_uq index is the real guard.
+      if (isUniqueLoanViolation(cause)) {
+        return err(new DomainError('LOAN_ALREADY_EXISTS', 'มีข้อมูลเงินกู้อยู่แล้ว'));
+      }
+      throw cause;
+    }
     return ok({ loanId: loan.id });
   }
+}
+
+function isUniqueLoanViolation(error: unknown): boolean {
+  for (let current: unknown = error, depth = 0; current && depth < 5; depth++) {
+    const e = current as { message?: unknown; code?: unknown; constraint_name?: unknown; cause?: unknown };
+    const text = `${String(e.message ?? '')} ${String(e.code ?? '')} ${String(e.constraint_name ?? '')}`;
+    if (text.includes('loans_user_uq') || text.includes('23505')) return true;
+    current = e.cause;
+  }
+  return false;
 }

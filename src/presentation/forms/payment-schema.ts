@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { PAYMENT_METHODS } from '@/domain/payment/payment';
+import { todayIso } from '@/presentation/view-models/today';
 import { isoDateString, moneyString } from './loan-schema';
 
 export const paymentFormSchema = z.object({
-  paidAt: isoDateString,
+  paidAt: isoDateString.refine((v) => v <= todayIso(), 'วันที่ชำระต้องไม่เป็นวันในอนาคต'),
   amount: moneyString,
   paymentMethod: z.enum(PAYMENT_METHODS, { message: 'กรุณาเลือกช่องทางการชำระ' }),
   referenceNo: z.string().trim().max(100, 'เลขอ้างอิงยาวเกินไป'),

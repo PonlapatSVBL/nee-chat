@@ -9,7 +9,7 @@
    ```bash
    DATABASE_URL='<session pooler uri>' npx drizzle-kit migrate
    ```
-   This also enables RLS and creates the private `evidence` bucket.
+   This also enables RLS (select-only owner policies; all writes go through the server) and creates the private `evidence` bucket.
 5. Authentication → URL Configuration:
    - Site URL: `https://<your-app>.vercel.app`
    - Redirect URLs: `https://<your-app>.vercel.app/auth/callback` (the template's `redirect_to` carries the deep link, so also allow `https://<your-app>.vercel.app/**` if Supabase rejects the redirect)
@@ -28,7 +28,7 @@
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (server only) |
    | `DATABASE_URL` | transaction pooler URI (port 6543) |
    | `NEXT_PUBLIC_SITE_URL` | `https://<your-app>.vercel.app` |
-   | `TZ` | `Asia/Bangkok` |
+   No `TZ` variable is needed: "today" is always computed in Asia/Bangkok.
 3. Deploy. Open the URL on your phone, log in with your email, add to home screen.
 
 ## 3. After each schema change
