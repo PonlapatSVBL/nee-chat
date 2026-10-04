@@ -43,7 +43,9 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const home = request.nextUrl.clone();
     home.pathname = '/';
     home.search = '';
-    return NextResponse.redirect(home);
+    const redirectResponse = NextResponse.redirect(home);
+    response.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c));
+    return redirectResponse;
   }
 
   return response;
