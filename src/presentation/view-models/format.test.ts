@@ -20,4 +20,8 @@ describe('format', () => {
   it('formats timestamps in Bangkok time', () => {
     expect(formatThaiDateTime(new Date('2026-10-04T09:05:00Z'))).toBe('4 ต.ค. 2569 16:05');
   });
+
+  it('formats midnight in Bangkok as 00:xx, not 24:xx', () => {
+    expect(formatThaiDateTime(new Date('2026-10-03T17:30:00Z'))).toBe('4 ต.ค. 2569 00:30');
+  });
 });

@@ -55,7 +55,7 @@ These are defined so the `ui/*` components work under a `.dark` class. Nothing s
 
 ## Typography
 
-- **Family:** IBM Plex Sans Thai (400/500/600/700) via `next/font`, exposed as `--font-sans`. Fallbacks: Noto Sans Thai, Leelawadee UI, Thonburi, then system-ui. One family covers everything. It has a matching Latin design and clear Thai loops, and the digits are tabular when `tabular-nums` is set.
+- **Family:** IBM Plex Sans Thai (400/500/600/700) via `next/font`, exposed as `--font-plex-thai` (mapped to `--font-sans` and `--font-heading` in `@theme inline`). Fallbacks: Noto Sans Thai, Leelawadee UI, Thonburi, then system-ui. One family covers everything. It has a matching Latin design and clear Thai loops, and the digits are tabular when `tabular-nums` is set.
 - **Scale:** fixed rem values at a ~1.2 ratio on a 16px base. These override Tailwind's `text-*` sizes. Line-heights are taller than a Latin-only scale because Thai places vowels and tone marks above and below the line.
 
 | Utility | Size | Line-height | Role |

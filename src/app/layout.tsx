@@ -6,7 +6,7 @@ import './globals.css';
 const font = IBM_Plex_Sans_Thai({
   subsets: ['thai', 'latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-sans',
+  variable: '--font-plex-thai',
   display: 'swap',
 });
 
