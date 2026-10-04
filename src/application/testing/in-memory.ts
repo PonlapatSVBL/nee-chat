@@ -18,6 +18,7 @@ import type { UnitOfWork } from '@/application/ports/unit-of-work';
 export class InMemoryLoanRepository implements LoanRepository {
   readonly loans = new Map<string, Loan>();
 
+  /** The domain allows one loan per user (SetupLoan refuses a second), so the first match is the loan. */
   async findByUserId(userId: string): Promise<Loan | null> {
     return [...this.loans.values()].find((l) => l.userId === userId) ?? null;
   }
@@ -150,6 +151,11 @@ export class SequenceIdGenerator implements IdGenerator {
   }
 }
 
+/**
+ * Test double. Does NOT roll back when fn throws — mutations made before the
+ * throw stay in the in-memory repositories. Use-case tests must not rely on
+ * atomicity; real rollback is covered by the Drizzle integration tests.
+ */
 export class InMemoryUnitOfWork implements UnitOfWork {
   constructor(private readonly repos: Repositories) {}
 

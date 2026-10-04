@@ -39,4 +39,32 @@ describe('in-memory test doubles', () => {
     expect(await storage.exists('u1/payments/p1/a.jpg')).toBe(false);
     expect(storage.deleted).toEqual(['u1/payments/p1/a.jpg']);
   });
+
+  it('insertMany with an empty list is a no-op and failOnInsert simulates persistence failure', async () => {
+    const { repos, clock, ids } = makeTestContext();
+    await repos.evidence.insertMany([]);
+    expect(await repos.evidence.countByPaymentIds(['p1'], 'u1')).toEqual({});
+
+    repos.payments.failOnInsert = true;
+    const p = createPayment(
+      { paidAt: DateOnly.of('2026-01-01'), amount: Money.of('1'), paymentMethod: 'ATM', referenceNo: null, notes: null },
+      { id: ids.next(), loanId: 'l1', userId: 'u1', now: clock.now() },
+    );
+    await expect(repos.payments.insert(p)).rejects.toThrow('simulated insert failure');
+  });
+
+  it('unit of work does not roll back (documented limitation)', async () => {
+    const { repos, uow, clock, ids } = makeTestContext();
+    const p = createPayment(
+      { paidAt: DateOnly.of('2026-01-01'), amount: Money.of('1'), paymentMethod: 'ATM', referenceNo: null, notes: null },
+      { id: ids.next(), loanId: 'l1', userId: 'u1', now: clock.now() },
+    );
+    await expect(
+      uow.run(async (r) => {
+        await r.payments.insert(p);
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    expect(await repos.payments.findById(p.id, 'u1')).not.toBeNull();
+  });
 });
