@@ -27,6 +27,13 @@ export class RecordPayment {
   ) {}
 
   async execute(input: RecordPaymentInput): Promise<Result<{ paymentId: string }>> {
+    const paymentId = input.paymentId ?? this.ids.next();
+    // The client always generates fresh ids: an existing one is a crafted/duplicate request, never touch its files.
+    if (input.paymentId) {
+      const existing = await this.uow.run((repos) => repos.payments.findById(paymentId, input.userId));
+      if (existing) return err(new DomainError('PERSISTENCE_FAILED', 'duplicate payment id'));
+    }
+
     const loan = await this.loans.findById(input.loanId, input.userId);
     if (!loan) return this.refuse(input, new DomainError('LOAN_NOT_FOUND', 'ไม่พบข้อมูลเงินกู้'));
 
@@ -34,13 +41,8 @@ export class RecordPayment {
     if (!draft.ok) return this.refuse(input, draft.error);
 
     const now = this.clock.now();
-    const paymentId = input.paymentId ?? this.ids.next();
-    if (input.paymentId) {
-      const existing = await this.uow.run((repos) => repos.payments.findById(paymentId, input.userId));
-      if (existing) return err(new DomainError('PERSISTENCE_FAILED', 'duplicate payment id'));
-    }
     const evidence = buildEvidenceList(input.evidence, { userId: input.userId, paymentId, now, ids: this.ids });
-    if (!evidence.ok) return err(evidence.error);
+    if (!evidence.ok) return this.refuse(input, evidence.error);
 
     const payment = createPayment(draft.value, { id: paymentId, loanId: loan.id, userId: input.userId, now });
 

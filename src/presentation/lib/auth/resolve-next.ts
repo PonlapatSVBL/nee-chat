@@ -5,7 +5,11 @@ export function safePath(value: string | null): string | null {
   try {
     const probe = new URL(value, 'http://nee.invalid');
     if (probe.origin !== 'http://nee.invalid') return null;
-    return `${probe.pathname}${probe.search}${probe.hash}`;
+    // Dot-segments (e.g. '/..//evil.com') normalise to a protocol-relative '//host' path.
+    if (probe.pathname.startsWith('//')) return null;
+    const result = `${probe.pathname}${probe.search}${probe.hash}`;
+    if (!result.startsWith('/') || result.startsWith('//')) return null;
+    return result;
   } catch {
     return null;
   }

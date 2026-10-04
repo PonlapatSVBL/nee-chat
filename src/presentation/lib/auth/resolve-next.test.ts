@@ -39,4 +39,17 @@ describe('resolveNext', () => {
     });
     expect(resolveNext(params, origin)).toBe('/payments/new');
   });
+
+  it('rejects dot-segment bypasses that normalise to a protocol-relative path', () => {
+    for (const next of ['%2F..%2F%2Fevil.com', '%2F%252e%252e%2F%2Fevil.com', '%2Fa%2F..%2F%2Fevil.com', '%2F.%2F%2Fevil.com']) {
+      expect(resolveNext(new URLSearchParams(`next=${next}`), origin)).toBe('/');
+    }
+    expect(resolveNext(new URLSearchParams({ next: '/%2e%2e//evil.com' }), origin)).toBe('/');
+  });
+
+  it('normalises harmless dot-segments and never returns a // path', () => {
+    const out = resolveNext(new URLSearchParams({ next: '/payments/../payments/new' }), origin);
+    expect(out).toBe('/payments/new');
+    expect(out.startsWith('//')).toBe(false);
+  });
 });

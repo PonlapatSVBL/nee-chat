@@ -115,6 +115,21 @@ describe('RecordPayment', () => {
     expect(ctx.storage.deleted).toEqual([]);
   });
 
+  it('never deletes files of an existing payment id even when the request is otherwise refused', async () => {
+    const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
+    const first = await record.execute({ ...base, loanId, paymentId: 'p-ex', evidence: [] });
+    expect(first.ok).toBe(true);
+    const path = 'u1/payments/p-ex/f1.jpg';
+    ctx.storage.files.add(path);
+    const r = await record.execute({
+      ...base, loanId, paymentId: 'p-ex', paidAt: '2026-10-05',
+      evidence: [{ fileId: 'f1', storagePath: path, mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null }],
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('PERSISTENCE_FAILED');
+    expect(ctx.storage.deleted).toEqual([]);
+  });
+
   it('rejects unknown loan, bad method, future date', async () => {
     const record = new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock);
     const noLoan = await record.execute({ ...base, loanId: 'x', paymentId: null, evidence: [] });

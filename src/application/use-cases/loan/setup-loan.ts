@@ -38,7 +38,7 @@ function isUniqueLoanViolation(error: unknown): boolean {
   for (let current: unknown = error, depth = 0; current && depth < 5; depth++) {
     const e = current as { message?: unknown; code?: unknown; constraint_name?: unknown; cause?: unknown };
     const text = `${String(e.message ?? '')} ${String(e.code ?? '')} ${String(e.constraint_name ?? '')}`;
-    if (text.includes('loans_user_uq') || text.includes('23505')) return true;
+    if (text.includes('loans_user_uq')) return true;
     current = e.cause;
   }
   return false;

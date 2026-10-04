@@ -111,4 +111,30 @@ describe('VoidPayment / CorrectPayment', () => {
     expect(ctx.storage.deleted).toContain('u1/payments/p5/f5.jpg');
     expect((await ctx.repos.payments.findById('p4', 'u1'))?.status).toBe('ACTIVE');
   });
+
+  it('CorrectPayment refuses a duplicate new payment id without deleting anything', async () => {
+    const cp = new CorrectPayment(ctx.uow, ctx.storage, ctx.ids, ctx.clock);
+    const file = { fileId: 'fx', storagePath: 'u1/payments/p1/fx.jpg', mimeType: 'image/jpeg', sizeBytes: 1, originalFilename: null };
+    const same = await cp.execute({
+      userId: 'u1', originalPaymentId: paymentId, newPaymentId: paymentId, reason: 'y',
+      paidAt: '2026-10-04', amount: '1', paymentMethod: 'ATM', referenceNo: null, notes: null, newEvidence: [file],
+    });
+    expect(same.ok).toBe(false);
+    if (!same.ok) expect(same.error.code).toBe('PERSISTENCE_FAILED');
+    expect(ctx.storage.deleted).toEqual([]);
+
+    const other = await new RecordPayment(ctx.repos.loans, ctx.uow, ctx.storage, ctx.ids, ctx.clock).execute({
+      userId: 'u1', loanId, paymentId: 'p-other', paidAt: '2026-10-01', amount: '100', paymentMethod: 'ATM', referenceNo: null, notes: null, evidence: [],
+    });
+    if (!other.ok) throw other.error;
+    await new VoidPayment(ctx.uow, ctx.ids, ctx.clock).execute({ userId: 'u1', paymentId, reason: 'x' });
+    const dup = await cp.execute({
+      userId: 'u1', originalPaymentId: paymentId, newPaymentId: 'p-other', reason: 'y',
+      paidAt: '2026-10-04', amount: '1', paymentMethod: 'ATM', referenceNo: null, notes: null,
+      newEvidence: [{ ...file, storagePath: 'u1/payments/p-other/fx.jpg' }],
+    });
+    expect(dup.ok).toBe(false);
+    if (!dup.ok) expect(dup.error.code).toBe('PERSISTENCE_FAILED');
+    expect(ctx.storage.deleted).toEqual([]);
+  });
 });

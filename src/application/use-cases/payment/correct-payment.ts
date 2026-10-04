@@ -26,6 +26,14 @@ export class CorrectPayment {
   ) {}
 
   async execute(input: CorrectPaymentInput): Promise<Result<{ paymentId: string }>> {
+    const duplicate = () => err(new DomainError('PERSISTENCE_FAILED', 'duplicate payment id'));
+    // Never delete files for an id that already exists (crafted/duplicate request).
+    if (input.newPaymentId && input.newPaymentId === input.originalPaymentId) return duplicate();
+    if (input.newPaymentId) {
+      const taken = await this.uow.run((repos) => repos.payments.findById(input.newPaymentId as string, input.userId));
+      if (taken) return duplicate();
+    }
+
     const now = this.clock.now();
     const draft = parsePaymentInput(input, this.clock.today());
     if (!draft.ok) {
