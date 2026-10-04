@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# หนี้ชัด (NeeChat)
 
-## Getting Started
+> บันทึกทุกการจ่าย ตรวจสอบทุกยอด
 
-First, run the development server:
+Personal loan ledger for กยศ. repayments: record each payment with its slip, keep a running ledger balance, and never lose history (edits void and replace, nothing is deleted). Mobile-first PWA. Not affiliated with กยศ.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+Next.js 15 (App Router) · Supabase (Postgres, Storage, Auth) · Drizzle ORM · Tailwind + shadcn/ui · Vitest · Playwright · Serwist
+
+## Architecture
+
+Clean Architecture, dependencies point inward (enforced by ESLint `boundaries`):
+
+```
+src/domain          entities, Money/DateOnly, ledger math (pure, no framework imports)
+src/application     ports (interfaces) + use cases
+src/infrastructure  Drizzle repositories, Supabase storage, container
+src/presentation    components, server actions, view-models     ┐ presentation
+src/app             Next.js routes (thin)                       ┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Design spec: `docs/superpowers/specs/2026-10-04-neechat-phase1-2-design.md`
+Implementation plan: `docs/superpowers/plans/2026-10-04-neechat-phase1-2.md`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Prereqs: Node 20+, Docker Desktop.
 
-## Learn More
+```bash
+npm install
+npx supabase start            # prints anon/service_role keys
+cp .env.example .env.local    # paste keys
+cp .env.example .env.test     # same values, used by integration/E2E tests
+npm run db:migrate
+npm run dev                   # http://localhost:3000
+```
 
-To learn more about Next.js, take a look at the following resources:
+Magic-link emails land in the local Mailpit inbox at http://127.0.0.1:54324. Supabase Studio: http://127.0.0.1:54323.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The email template is `supabase/templates/magic_link.html`. It links to `/auth/callback?token_hash=…&type=email&redirect_to=…`; the `redirect_to` parameter carries the deep link the user lands on after login.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Testing on a real phone (ทดสอบบนมือถือจริง)
 
-## Deploy on Vercel
+The evidence picker uses `crypto.randomUUID()`, which only exists in a secure context. Opening the dev server over plain `http://<LAN-IP>:3000` from a phone will therefore fail to pick files. Instead use one of:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `localhost` forwarding, e.g. `adb reverse tcp:3000 tcp:3000` (Android) and open `http://localhost:3000` on the phone
+- an HTTPS tunnel to your dev server
+- the deployed HTTPS URL (see `docs/deploy.md`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+| Script | What |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm run test` | unit tests (domain, application, view-models) |
+| `npm run test:int` | integration tests against local Supabase |
+| `npm run e2e` | Playwright mobile flow (starts `npm run dev` via `webServer`; logs in through the admin API, no email needed) |
+| `npm run lint` / `typecheck` | ESLint incl. layer boundaries / tsc |
+| `npm run db:generate` / `db:migrate` | Drizzle migrations |
+| `npm run icons` | regenerate PWA icons |
+
+## Ledger rules
+
+- Ledger Balance = opening balance − Σ ACTIVE payments dated after the opening-balance date.
+- Payments are immutable. Editing voids the original and creates a replacement linked by a correction record. Voiding records a correction without a replacement.
+- Evidence files live in the private `evidence` bucket and are served through 1-hour signed URLs.
+
+## Deploy
+
+See `docs/deploy.md`.
