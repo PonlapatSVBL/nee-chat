@@ -11,7 +11,7 @@ export default async function NewPaymentPage() {
   const userId = await requireUserId();
   const container = getContainer();
   const dashboard = await container.getDashboard.execute({ userId });
-  if (!dashboard.ok) redirect('/setup');
+  if (!dashboard.ok) redirect(dashboard.error.code === 'LOAN_NOT_FOUND' ? '/setup' : '/');
 
   const { loan, summary } = dashboard.value;
   const latest = summary.latestPayment;

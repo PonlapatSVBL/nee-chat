@@ -1,7 +1,7 @@
 'use client';
 
 import { Camera, FileText, Images, X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { MAX_EVIDENCE_BYTES } from '@/domain/evidence/evidence';
 import { Button } from '@/presentation/components/ui/button';
@@ -11,55 +11,68 @@ import { cn } from '@/presentation/lib/utils';
 
 interface Props {
   files: PendingFile[];
-  onChange: (files: PendingFile[]) => void;
+  onChange: (update: PendingFile[] | ((prev: PendingFile[]) => PendingFile[])) => void;
   disabled?: boolean;
+  onProcessingChange?: (processing: boolean) => void;
 }
 
 const pickerButton =
   'h-14 rounded-xl text-base font-medium transition-[transform,background-color,color] duration-150 ease-out-quart active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100';
 
-export function EvidencePicker({ files, onChange, disabled }: Props) {
+export function EvidencePicker({ files, onChange, disabled, onProcessingChange }: Props) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const [processing, setProcessing] = useState(false);
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const pickerDisabled = disabled || processing;
 
-  useEffect(() => {
-    return () => {
-      files.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
-    };
-    // revoke only on unmount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Revoke only on unmount, against the latest list (not the initial empty one).
+  useEffect(
+    () => () => {
+      filesRef.current.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl));
+    },
+    [],
+  );
 
   async function addFiles(list: FileList | null) {
     if (!list) return;
+    const selected = Array.from(list);
     const added: PendingFile[] = [];
-    for (const file of Array.from(list)) {
-      try {
-        const { blob, mimeType } = await prepareForUpload(file);
-        if (blob.size > MAX_EVIDENCE_BYTES) {
-          toast.error(`ไฟล์ ${file.name} ใหญ่เกิน 5 MB`);
-          continue;
+    setProcessing(true);
+    onProcessingChange?.(true);
+    try {
+      for (const file of selected) {
+        try {
+          const { blob, mimeType } = await prepareForUpload(file);
+          if (blob.size > MAX_EVIDENCE_BYTES) {
+            toast.error(`ไฟล์ ${file.name} ใหญ่เกิน 5 MB`);
+            continue;
+          }
+          added.push({
+            id: crypto.randomUUID(),
+            blob,
+            name: file.name,
+            mimeType,
+            previewUrl: mimeType.startsWith('image/') ? URL.createObjectURL(blob) : null,
+          });
+        } catch {
+          toast.error(`อ่านไฟล์ ${file.name} ไม่ได้`);
         }
-        added.push({
-          id: crypto.randomUUID(),
-          blob,
-          name: file.name,
-          mimeType,
-          previewUrl: mimeType.startsWith('image/') ? URL.createObjectURL(blob) : null,
-        });
-      } catch {
-        toast.error(`อ่านไฟล์ ${file.name} ไม่ได้`);
       }
+      onChange((prev) => [...prev, ...added]);
+    } finally {
+      setProcessing(false);
+      onProcessingChange?.(false);
+      if (cameraRef.current) cameraRef.current.value = '';
+      if (galleryRef.current) galleryRef.current.value = '';
     }
-    onChange([...files, ...added]);
-    if (cameraRef.current) cameraRef.current.value = '';
-    if (galleryRef.current) galleryRef.current.value = '';
   }
 
   function remove(id: string) {
     const target = files.find((f) => f.id === id);
     if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
-    onChange(files.filter((f) => f.id !== id));
+    onChange((prev) => prev.filter((f) => f.id !== id));
   }
 
   return (
@@ -74,7 +87,7 @@ export function EvidencePicker({ files, onChange, disabled }: Props) {
         tabIndex={-1}
         aria-hidden
         onChange={(e) => void addFiles(e.target.files)}
-        disabled={disabled}
+        disabled={pickerDisabled}
       />
       <input
         ref={galleryRef}
@@ -86,7 +99,7 @@ export function EvidencePicker({ files, onChange, disabled }: Props) {
         tabIndex={-1}
         aria-hidden
         onChange={(e) => void addFiles(e.target.files)}
-        disabled={disabled}
+        disabled={pickerDisabled}
       />
       <div className="grid grid-cols-2 gap-2">
         <Button
@@ -95,7 +108,7 @@ export function EvidencePicker({ files, onChange, disabled }: Props) {
           variant="secondary"
           className={pickerButton}
           onClick={() => cameraRef.current?.click()}
-          disabled={disabled}
+          disabled={pickerDisabled}
         >
           <Camera className="size-5" aria-hidden /> ถ่ายรูปสลิป
         </Button>
@@ -105,7 +118,7 @@ export function EvidencePicker({ files, onChange, disabled }: Props) {
           variant="outline"
           className={cn(pickerButton, 'border-input shadow-none')}
           onClick={() => galleryRef.current?.click()}
-          disabled={disabled}
+          disabled={pickerDisabled}
         >
           <Images className="size-5" aria-hidden /> เลือกจากเครื่อง
         </Button>

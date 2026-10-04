@@ -47,6 +47,7 @@ export function PaymentForm({ mode, defaults, originalPaymentId, existingEvidenc
   const router = useRouter();
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(mode === 'correct' ? correctionFormSchema : paymentFormSchema),
     defaultValues: defaults,
@@ -58,13 +59,23 @@ export function PaymentForm({ mode, defaults, originalPaymentId, existingEvidenc
   });
 
   async function onSubmit(values: PaymentFormValues) {
+    if (processing) return;
+    if (mode === 'correct' && !originalPaymentId) {
+      toast.error('ไม่พบรายการเดิม');
+      return;
+    }
     setBusy(true);
     try {
       const { paymentId, uploaded } = await uploadEvidence(files, null);
       const result =
         mode === 'create'
           ? await recordPaymentAction({ values, paymentId, evidence: uploaded })
-          : await correctPaymentAction({ originalPaymentId: originalPaymentId!, newPaymentId: paymentId, values, evidence: uploaded });
+          : await correctPaymentAction({
+              originalPaymentId: originalPaymentId ?? '',
+              newPaymentId: paymentId,
+              values,
+              evidence: uploaded,
+            });
 
       if (!result.ok) {
         if (result.fieldErrors) {
@@ -163,7 +174,7 @@ export function PaymentForm({ mode, defaults, originalPaymentId, existingEvidenc
             <p className="text-sm text-muted-foreground">สลิปเดิม {existingEvidenceCount} ไฟล์จะติดไปกับรายการใหม่อัตโนมัติ</p>
           )}
         </div>
-        <EvidencePicker files={files} onChange={setFiles} disabled={busy} />
+        <EvidencePicker files={files} onChange={setFiles} disabled={busy} onProcessingChange={setProcessing} />
         {noEvidence && (
           <p className="flex gap-2.5 rounded-lg bg-warning/10 p-3 text-sm text-foreground">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
@@ -205,9 +216,9 @@ export function PaymentForm({ mode, defaults, originalPaymentId, existingEvidenc
         type="submit"
         size="lg"
         className="h-14 rounded-xl text-base font-semibold transition-[transform,background-color] duration-150 ease-out-quart active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100"
-        disabled={busy}
+        disabled={busy || processing}
       >
-        {busy ? 'กำลังบันทึก…' : 'บันทึก'}
+        {busy ? 'กำลังบันทึก…' : processing ? 'กำลังเตรียมรูป…' : 'บันทึก'}
       </Button>
     </form>
   );

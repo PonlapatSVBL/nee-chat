@@ -24,22 +24,31 @@ export async function uploadEvidence(
   const uploaded: UploadedEvidenceInput[] = [];
 
   for (const file of files) {
-    const prepared = await prepareUploadAction({ paymentId: currentPaymentId, mimeType: file.mimeType, sizeBytes: file.blob.size });
-    if (!prepared.ok) throw new UploadError(prepared.message);
-    currentPaymentId = prepared.data.paymentId;
+    try {
+      const prepared = await prepareUploadAction({
+        paymentId: currentPaymentId,
+        mimeType: file.mimeType,
+        sizeBytes: file.blob.size,
+      });
+      if (!prepared.ok) throw new UploadError(prepared.message);
+      currentPaymentId = prepared.data.paymentId;
 
-    const { error } = await supabase.storage
-      .from('evidence')
-      .uploadToSignedUrl(prepared.data.storagePath, prepared.data.token, file.blob, { contentType: file.mimeType });
-    if (error) throw new UploadError(error.message);
+      const { error } = await supabase.storage
+        .from('evidence')
+        .uploadToSignedUrl(prepared.data.storagePath, prepared.data.token, file.blob, { contentType: file.mimeType });
+      if (error) throw new UploadError(error.message);
 
-    uploaded.push({
-      fileId: prepared.data.fileId,
-      storagePath: prepared.data.storagePath,
-      mimeType: file.mimeType,
-      sizeBytes: file.blob.size,
-      originalFilename: file.name,
-    });
+      uploaded.push({
+        fileId: prepared.data.fileId,
+        storagePath: prepared.data.storagePath,
+        mimeType: file.mimeType,
+        sizeBytes: file.blob.size,
+        originalFilename: file.name,
+      });
+    } catch (e) {
+      // Network failures and thrown server actions must still surface the upload toast.
+      throw e instanceof UploadError ? e : new UploadError(String(e));
+    }
   }
   return { paymentId: currentPaymentId, uploaded };
 }
